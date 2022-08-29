@@ -4,15 +4,29 @@ const { RefreshingAuthProvider } = require('@twurple/auth');
 const { ApiClient } = require('@twurple/api');
 const { ChatClient } = require('@twurple/chat');
 
-const { dbLogging, commandCooldown, twitchClientId, twitchClientSecret } = require('./config.json');
+const { dbLogging, botPrefix, commandCooldown, twitchClientId, twitchClientSecret } = require('./config.json');
 const { init_db } = require('./src/datamgmt/setup');
 const { insert_bot_user, get_bot_users } = require('./src/datamgmt/db_utils');
+const { get_fernando_quote } = require('./src/fernando/fernando_util');
+
+// lista de comandos globales del bot
+const global_commands = ['fernando']
 
 // monitor de cooldown para cada uno de los canales en los que está el bot
 const cooldown = {};
 
 // información de token del bot (incluye ID y nombre en Twitch)
 let token_info = null;
+
+// clientes de API y de chat
+let api_client = null;
+let chat_client = null;
+
+
+function set_cooldown(channel) {
+    cooldown[channel] = true;
+    setTimeout(() => { cooldown[channel] = false; }, commandCooldown * 1000);
+}
 
 
 async function main() {
@@ -32,7 +46,7 @@ async function main() {
     );
 
     // obtener cliente de API de Twitch
-    const api_client = new ApiClient({ authProvider: auth_provider });
+    api_client = new ApiClient({ authProvider: auth_provider });
 
     // registrar canal del bot en base de datos, si no está registrado todavía
     token_info = await api_client.getTokenInfo();
@@ -42,15 +56,25 @@ async function main() {
     const user_list = await get_bot_users(db);
     const channel_list = user_list.map(item => item.Name);
 
-    const chat_client = new ChatClient({ authProvider: auth_provider, channels: channel_list });
+    // obtener y conectar cliente de chat de Twitch
+    chat_client = new ChatClient({ authProvider: auth_provider, channels: channel_list });
     await chat_client.connect();
 
+    // procesador de mensajes del bot
     chat_client.onMessage(async (channel, user, message, msg) => {
+        // ignorar si no es un comando o si el canal está en cooldown
+        if (!message.startsWith(botPrefix)) return;
         if (cooldown[channel]) return;
-        cooldown[channel] = true;
-        setTimeout(() => { cooldown[channel] = false; }, commandTimeout * 1000);
 
-        await chat_client.say(channel, message);
+        message = message.trim().toLowerCase().substring(botPrefix.length);
+
+        // RUTINAS DE COMANDOS
+        // !fernando
+        if (message.startsWith('fernando')) {
+            const quote = await get_fernando_quote();
+            await chat_client.say(channel, quote);
+            set_cooldown(channel);
+        }
     });
 
     console.log(`Bot arrancado como usuario de Twitch: ${token_info.userName}`);
