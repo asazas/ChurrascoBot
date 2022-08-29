@@ -75,7 +75,7 @@ async function main() {
             // RUTINAS DE COMANDOS
 
             // !hola
-            if (args.length === 1 && args[0] === 'hola') {
+            if (msg.channelId === token_info.userId && args.length === 1 && args[0] === 'hola') {
                 await insert_bot_user(db, msg.userInfo.userId, msg.userInfo.userName);
                 await chat_client.join(msg.userInfo.userName);
                 await chat_client.say(channel, `Hola, ${user}. Me he unido a tu canal.`)
@@ -84,7 +84,7 @@ async function main() {
             }
 
             // !adios
-            else if (args.length === 1 && args[0] === 'adios') {
+            else if (msg.channelId === token_info.userId && args.length === 1 && args[0] === 'adios') {
                 await remove_bot_user(db, msg.userInfo.userId);
                 chat_client.part(msg.userInfo.userName);
                 await chat_client.say(channel, `Adiós, ${user}. He salido de tu canal.`)
