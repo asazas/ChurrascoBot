@@ -6,11 +6,11 @@ const { ChatClient } = require('@twurple/chat');
 
 const { dbLogging, botPrefix, commandCooldown, twitchClientId, twitchClientSecret } = require('./config.json');
 const { init_db } = require('./src/datamgmt/setup');
-const { insert_bot_user, get_bot_users } = require('./src/datamgmt/db_utils');
+const { insert_bot_user, get_bot_users, remove_bot_user } = require('./src/datamgmt/db_utils');
 const { get_fernando_quote } = require('./src/fernando/fernando_util');
 
 // lista de comandos globales del bot
-const global_commands = ['fernando']
+const global_commands = ['hola', 'adios', 'clip', 'fernando']
 
 // monitor de cooldown para cada uno de los canales en los que está el bot
 const cooldown = {};
@@ -62,18 +62,48 @@ async function main() {
 
     // procesador de mensajes del bot
     chat_client.onMessage(async (channel, user, message, msg) => {
-        // ignorar si no es un comando o si el canal está en cooldown
-        if (!message.startsWith(botPrefix)) return;
-        if (cooldown[channel]) return;
+        try {
+            // ignorar si no es un comando o si el canal está en cooldown
+            if (!message.startsWith(botPrefix)) return;
+            if (cooldown[channel]) return;
 
-        message = message.trim().toLowerCase().substring(botPrefix.length);
+            message = message.trim().toLowerCase().substring(botPrefix.length);
 
-        // RUTINAS DE COMANDOS
-        // !fernando
-        if (message.startsWith('fernando')) {
-            const quote = await get_fernando_quote();
-            await chat_client.say(channel, quote);
-            set_cooldown(channel);
+
+            // RUTINAS DE COMANDOS
+
+            // !hola
+            if (message === 'hola') {
+                await insert_bot_user(db, msg.userInfo.userId, msg.userInfo.userName);
+                await chat_client.join(msg.userInfo.userName);
+                await chat_client.say(channel, `Hola, ${user}. Me he unido a tu canal.`)
+                set_cooldown(channel);
+            }
+
+            // !adios
+            if (message === 'adios') {
+                await remove_bot_user(db, msg.userInfo.userId);
+                chat_client.part(msg.userInfo.userName);
+                await chat_client.say(channel, `Adiós, ${user}. He salido de tu canal.`)
+                set_cooldown(channel);
+            }
+
+            // !clip
+            if (message === 'clip') {
+                const clip_id = await api_client.clips.createClip({ channelId: msg.channelId });
+                const clip = await api_client.clips.getClipById(clip_id);
+                await chat_client.say(channel, clip.url);
+                set_cooldown(channel);
+            }
+
+            // !fernando
+            if (message.startsWith('fernando')) {
+                const quote = await get_fernando_quote();
+                await chat_client.say(channel, quote);
+                set_cooldown(channel);
+            }
+        } catch (error) {
+            console.log(error['message']);
         }
     });
 

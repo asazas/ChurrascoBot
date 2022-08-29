@@ -26,7 +26,7 @@ async function get_bot_users(sequelize) {
 
 
 /**
- * @summary Llamado al añadir un nuevo usuario del bot.
+ * @summary Llamado al añadir un nuevo usuario del bot (comando !hola).
  * 
  * @description Registra un canal de Twitch para que el bot empiece a escuchar en su chat.
  * 
@@ -54,4 +54,34 @@ async function insert_bot_user(sequelize, user_id, user_name) {
 }
 
 
-module.exports = { get_bot_users, insert_bot_user };
+/**
+ * @summary Llamado al eliminar un usuario del bot (comando !adios).
+ * 
+ * @description Elimina un canal de Twitch del registro y hace que el bot deje de escuchar en su chat.
+ * 
+ * @param {Sequelize} sequelize Base de datos del bot.
+ * @param {string}    user_id   ID de Twitch asociado al usuario a eliminar.
+ * 
+ * @returns {number} Número de entradas de base de datos eliminadas.
+ */
+async function remove_bot_user(sequelize, user_id) {
+    const channels = sequelize.models.Channels;
+    try {
+        return await sequelize.transaction(async (t) => {
+            return await channels.destroy(
+                {
+                    where: {
+                        UserId: user_id,
+                    }
+                },
+                {
+                    transaction: t,
+                });
+        });
+    }
+    catch (error) {
+        console.error(error['message']);
+    }
+}
+
+module.exports = { get_bot_users, insert_bot_user, remove_bot_user };
