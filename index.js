@@ -51,7 +51,7 @@ async function main() {
 
     // registrar canal del bot en base de datos, si no está registrado todavía
     token_info = await api_client.getTokenInfo();
-    await insert_bot_user(db, token_info.userId, token_info.userName);
+    await insert_bot_user(db, token_info.userId, token_info.userName.toLowerCase());
 
     // obtener lista de canales a los que el bot debe conectarse
     const user_list = await get_bot_users(db);
@@ -76,7 +76,7 @@ async function main() {
 
             // !hola
             if (msg.channelId === token_info.userId && args.length === 1 && args[0] === 'hola') {
-                await insert_bot_user(db, msg.userInfo.userId, msg.userInfo.userName);
+                await insert_bot_user(db, msg.userInfo.userId, msg.userInfo.userName.toLowerCase());
                 await chat_client.join(msg.userInfo.userName);
                 await chat_client.say(channel, `Hola, ${user}. Me he unido a tu canal.`)
                 set_cooldown(channel);
