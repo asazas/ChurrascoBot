@@ -13,7 +13,7 @@ const { Sequelize, DataTypes } = require('sequelize');
 async function init_db(db_logging) {
     const sequelize = new Sequelize({
         dialect: 'sqlite',
-        storage: 'data/bot-db.db',
+        storage: 'data/churrascobot.db',
         logging: db_logging ? console.log : false,
         define: { freezeTableName: true, timestamps: false },
     });
@@ -30,19 +30,25 @@ async function init_db(db_logging) {
     });
 
     const commands = sequelize.define('Commands', {
+        Id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+        },
         Name: {
             type: DataTypes.TEXT,
-            primaryKey: true,
+            unique: 'UniqueKey',
         },
         User: {
             type: DataTypes.TEXT,
+            unique: 'UniqueKey',
         },
         Response: {
             type: DataTypes.TEXT,
             allowNull: false,
         }
     });
-    commands.belongsTo(channels, { as: 'channel', foreignKey: 'Channel', onDelete: 'CASCADE' });
+    commands.belongsTo(channels, { as: 'channel', foreignKey: 'Channel', onDelete: 'NO ACTION' });
 
     await sequelize.sync();
     return sequelize;

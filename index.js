@@ -6,11 +6,12 @@ const { ChatClient } = require('@twurple/chat');
 
 const { dbLogging, botPrefix, commandCooldown, twitchClientId, twitchClientSecret } = require('./config.json');
 const { init_db } = require('./src/datamgmt/setup');
-const { insert_bot_user, get_bot_users, remove_bot_user } = require('./src/datamgmt/db_utils');
+const { insert_bot_user, get_bot_users, remove_bot_user, add_or_edit_command, delete_command, get_commands_for_channels } = require('./src/datamgmt/db_utils');
 const { get_fernando_quote } = require('./src/fernando/fernando_util');
+const { obtener_respuesta_de_comando } = require('./src/comandos/comandos_util');
 
 // lista de comandos globales del bot
-const global_commands = ['hola', 'adios', 'clip', 'fernando']
+const global_commands = ['hola', 'adios', 'clip', 'fernando', 'comando', 'borracomando', 'comandos']
 
 // monitor de cooldown para cada uno de los canales en los que está el bot
 const cooldown = {};
@@ -68,42 +69,128 @@ async function main() {
             if (cooldown[channel]) return;
 
             message = message.trim().toLowerCase().substring(botPrefix.length);
+            const args = message.split(/\s+/);
 
 
             // RUTINAS DE COMANDOS
 
             // !hola
-            if (message === 'hola') {
+            if (args.length === 1 && args[0] === 'hola') {
                 await insert_bot_user(db, msg.userInfo.userId, msg.userInfo.userName);
                 await chat_client.join(msg.userInfo.userName);
                 await chat_client.say(channel, `Hola, ${user}. Me he unido a tu canal.`)
                 set_cooldown(channel);
+                return;
             }
 
             // !adios
-            if (message === 'adios') {
+            else if (args.length === 1 && args[0] === 'adios') {
                 await remove_bot_user(db, msg.userInfo.userId);
                 chat_client.part(msg.userInfo.userName);
                 await chat_client.say(channel, `Adiós, ${user}. He salido de tu canal.`)
                 set_cooldown(channel);
+                return;
             }
 
             // !clip
-            if (message === 'clip') {
-                const clip_id = await api_client.clips.createClip({ channelId: msg.channelId });
+            else if (args.length === 1 && args[0] === 'clip') {
+                try {
+                    const clip_id = await api_client.clips.createClip({ channelId: msg.channelId });
+                } catch (error) {
+                    if (error.name === 'HttpStatusCodeError' && error.statusCode === 404) {
+                        await chat_client.say(channel, 'No se pueden crear clips en canales desconectados.');
+                        set_cooldown(channel);
+                        return;
+                    }
+                    else throw error;
+                }
                 const clip = await api_client.clips.getClipById(clip_id);
                 await chat_client.say(channel, clip.url);
                 set_cooldown(channel);
+                return;
             }
 
             // !fernando
-            if (message.startsWith('fernando')) {
+            else if (args[0] === 'fernando') {
                 const quote = await get_fernando_quote();
                 await chat_client.say(channel, quote);
                 set_cooldown(channel);
+                return;
             }
+
+            // !comando
+            else if (args[0] === 'comando') {
+                if (!(msg.userInfo.isBroadcaster || msg.userInfo.isMod)) {
+                    await chat_client.say(channel, 'Solo moderadores del canal pueden ejecutar este comando.');
+                    set_cooldown(channel);
+                    return;
+                }
+                if (args.length < 3) {
+                    await chat_client.say(channel, 'Es necesario especificar el nombre del comando y su respuesta.');
+                    set_cooldown(channel);
+                    return;
+                }
+                if (global_commands.includes(args[1])) {
+                    await chat_client.say(channel, 'El nombre del comando no puede coincidir con el de un comando global.');
+                    set_cooldown(channel);
+                    return;
+                }
+                await add_or_edit_command(db, args[1], msg.channelId, args.slice(2).join(' '));
+                await chat_client.say(channel, `El comando ${args[1]} se ha añadido correctamente al canal.`);
+                set_cooldown(channel);
+                return;
+            }
+
+            // !borracomando
+            else if (args[0] === 'borracomando') {
+                if (!(msg.userInfo.isBroadcaster || msg.userInfo.isMod)) {
+                    await chat_client.say(channel, 'Solo moderadores del canal pueden ejecutar este comando.');
+                    set_cooldown(channel);
+                    return;
+                }
+                if (args.length !== 2) {
+                    await chat_client.say(channel, 'Es necesario especificar el nombre del comando a borrar.');
+                    set_cooldown(channel);
+                    return;
+                }
+                const borrados = await delete_command(db, args[1], msg.channelId);
+                if (borrados) {
+                    await chat_client.say(channel, `El comando ${args[1]} se ha eliminado del canal.`);
+                }
+                else {
+                    await chat_client.say(channel, `No existe ningún comando con ese nombre.`);
+                }
+                set_cooldown(channel);
+                return;
+            }
+
+            // !comandos
+            else if (args.length === 1 && args[0] === 'comandos') {
+                const comms = await get_commands_for_channels(db, [msg.channelId, token_info.userId]);
+                if (comms.length === 0) {
+                    await chat_client.say(channel, `No hay comandos definidos en este canal.`);
+                }
+                else {
+                    const comm_names = [...new Set(comms.map(item => item.Name))].sort();
+                    await chat_client.say(channel, `Mis comandos: ${comm_names.join(', ')}`);
+                }
+                set_cooldown(channel);
+                return;
+            }
+
+            // comandos definidos en canales
+            else {
+                const args = message.split(/\s+/);
+                const response = await obtener_respuesta_de_comando(db, args[0], [msg.channelId, token_info.userId]);
+                if (response) {
+                    await chat_client.say(channel, response);
+                }
+                set_cooldown(channel);
+                return;
+            }
+
         } catch (error) {
-            console.log(error['message']);
+            console.error(error['message']);
         }
     });
 
