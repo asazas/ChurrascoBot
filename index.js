@@ -103,11 +103,14 @@ async function main() {
                         set_cooldown(channel);
                         return;
                     }
-                    else throw error;
+                    else {
+                        await chat_client.say(channel, 'Se ha producido un error al intentar crear el clip.');
+                        set_cooldown(channel);
+                        throw error;
+                    }
                 }
                 if (clip_id) {
-                    const clip = await api_client.clips.getClipById(clip_id);
-                    await chat_client.say(channel, clip.url);
+                    await chat_client.say(channel, `https://clips.twitch.tv/${clip_id}`);
                     set_cooldown(channel);
                     return;
                 }
