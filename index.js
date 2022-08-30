@@ -68,14 +68,15 @@ async function main() {
             if (!message.startsWith(botPrefix)) return;
             if (cooldown[channel]) return;
 
-            message = message.trim().toLowerCase().substring(botPrefix.length);
+            message = message.trim().substring(botPrefix.length);
             const args = message.split(/\s+/);
+            const comm = args[0].toLowerCase();
 
 
             // RUTINAS DE COMANDOS
 
             // !hola
-            if (msg.channelId === token_info.userId && args.length === 1 && args[0] === 'hola') {
+            if (msg.channelId === token_info.userId && args.length === 1 && comm === 'hola') {
                 await insert_bot_user(db, msg.userInfo.userId, msg.userInfo.userName.toLowerCase());
                 await chat_client.join(msg.userInfo.userName);
                 await chat_client.say(channel, `Hola, ${user}. Me he unido a tu canal.`)
@@ -84,7 +85,7 @@ async function main() {
             }
 
             // !adios
-            else if (msg.channelId === token_info.userId && args.length === 1 && args[0] === 'adios') {
+            else if (msg.channelId === token_info.userId && args.length === 1 && comm === 'adios') {
                 await remove_bot_user(db, msg.userInfo.userId);
                 chat_client.part(msg.userInfo.userName);
                 await chat_client.say(channel, `Adiós, ${user}. He salido de tu canal.`)
@@ -93,7 +94,7 @@ async function main() {
             }
 
             // !clip
-            else if (args.length === 1 && args[0] === 'clip') {
+            else if (args.length === 1 && comm === 'clip') {
                 let clip_id = null;
                 try {
                     clip_id = await api_client.clips.createClip({ channelId: msg.channelId });
@@ -117,7 +118,7 @@ async function main() {
             }
 
             // !fernando
-            else if (args[0] === 'fernando') {
+            else if (comm === 'fernando') {
                 const quote = await get_fernando_quote();
                 await chat_client.say(channel, quote);
                 set_cooldown(channel);
@@ -125,7 +126,7 @@ async function main() {
             }
 
             // !comando
-            else if (args[0] === 'comando') {
+            else if (comm === 'comando') {
                 if (!(msg.userInfo.isBroadcaster || msg.userInfo.isMod)) {
                     await chat_client.say(channel, 'Solo moderadores del canal pueden ejecutar este comando.');
                     set_cooldown(channel);
@@ -136,19 +137,19 @@ async function main() {
                     set_cooldown(channel);
                     return;
                 }
-                if (global_commands.includes(args[1])) {
+                if (global_commands.includes(args[1].toLowerCase())) {
                     await chat_client.say(channel, 'El nombre del comando no puede coincidir con el de un comando global.');
                     set_cooldown(channel);
                     return;
                 }
-                await add_or_edit_command(db, args[1], msg.channelId, args.slice(2).join(' '));
-                await chat_client.say(channel, `El comando ${args[1]} se ha añadido correctamente al canal.`);
+                await add_or_edit_command(db, args[1].toLowerCase(), msg.channelId, args.slice(2).join(' '));
+                await chat_client.say(channel, `El comando ${args[1].toLowerCase()} se ha añadido correctamente al canal.`);
                 set_cooldown(channel);
                 return;
             }
 
             // !borracomando
-            else if (args[0] === 'borracomando') {
+            else if (comm === 'borracomando') {
                 if (!(msg.userInfo.isBroadcaster || msg.userInfo.isMod)) {
                     await chat_client.say(channel, 'Solo moderadores del canal pueden ejecutar este comando.');
                     set_cooldown(channel);
@@ -159,9 +160,9 @@ async function main() {
                     set_cooldown(channel);
                     return;
                 }
-                const borrados = await delete_command(db, args[1], msg.channelId);
+                const borrados = await delete_command(db, args[1].toLowerCase(), msg.channelId);
                 if (borrados) {
-                    await chat_client.say(channel, `El comando ${args[1]} se ha eliminado del canal.`);
+                    await chat_client.say(channel, `El comando ${args[1].toLowerCase()} se ha eliminado del canal.`);
                 }
                 else {
                     await chat_client.say(channel, `No existe ningún comando con ese nombre.`);
@@ -171,7 +172,7 @@ async function main() {
             }
 
             // !comandos
-            else if (args.length === 1 && args[0] === 'comandos') {
+            else if (args.length === 1 && comm === 'comandos') {
                 const comms = await get_commands_for_channels(db, [msg.channelId, token_info.userId]);
                 if (comms.length === 0) {
                     await chat_client.say(channel, `No hay comandos definidos en este canal.`);
@@ -187,7 +188,7 @@ async function main() {
             // comandos definidos en canales
             else {
                 const args = message.split(/\s+/);
-                const response = await obtener_respuesta_de_comando(db, args[0], [msg.channelId, token_info.userId]);
+                const response = await obtener_respuesta_de_comando(db, comm, [msg.channelId, token_info.userId]);
                 if (response) {
                     await chat_client.say(channel, response);
                 }
