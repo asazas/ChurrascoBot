@@ -94,8 +94,9 @@ async function main() {
 
             // !clip
             else if (args.length === 1 && args[0] === 'clip') {
+                let clip_id = null;
                 try {
-                    const clip_id = await api_client.clips.createClip({ channelId: msg.channelId });
+                    clip_id = await api_client.clips.createClip({ channelId: msg.channelId });
                 } catch (error) {
                     if (error.name === 'HttpStatusCodeError' && error.statusCode === 404) {
                         await chat_client.say(channel, 'No se pueden crear clips en canales desconectados.');
@@ -104,10 +105,12 @@ async function main() {
                     }
                     else throw error;
                 }
-                const clip = await api_client.clips.getClipById(clip_id);
-                await chat_client.say(channel, clip.url);
-                set_cooldown(channel);
-                return;
+                if (clip_id) {
+                    const clip = await api_client.clips.getClipById(clip_id);
+                    await chat_client.say(channel, clip.url);
+                    set_cooldown(channel);
+                    return;
+                }
             }
 
             // !fernando
